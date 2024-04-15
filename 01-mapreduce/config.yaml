@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+# kind: Pod
+kind: Deployment
+metadata:
+  name: mapreduce-master
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mapreduce-master
+  template:
+    metadata:
+      labels:
+        app: mapreduce-master
+    spec:
+      containers:
+      - name: mapreduce-master
+        image: maxproske/mapreduce:latest
+        ports:
+        - containerPort: 3000
+          name: mapper
+        env:
+        - name: TYPE
+          value: "MASTER"
+        - name: MAPPER_HOST
+          value: "mappers"
+        - name: REDUCER_HOST
+          value: "reducers"
+        - name: MAPPER_PORT
+          value: "3000"
+        - name: REDUCER_PORT
+          value: "3000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mappers
+  labels:
+    app: mappers
+spec:
+  ports:
+  - port: 3000
+    name: mapper
+  clusterIP: None
+  selector:
+    app: mappers
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mapper
+spec:
+  serviceName: "mappers"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mappers
+  template:
+    metadata:
+      labels:
+        app: mappers
+    spec:
+      containers:
+      - name: mapreduce
+        image: maxproske/mapreduce:latest
+        ports:
+        - containerPort: 3000
+          name: mapper
+        env:
+        - name: TYPE
+          value: "MAP"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: mapreduce-master
+spec:
+  type: LoadBalancer
+  selector:
+    app: mapreduce-master
+  ports:
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reducers
+  labels:
+    app: reducers
+spec:
+  ports:
+  - port: 3000
+    name: reducer
+  clusterIP: None
+  selector:
+    app: reducers
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: reducer
+spec:
+  serviceName: "reducers"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: reducers
+  template:
+    metadata:
+      labels:
+        app: reducers
+    spec:
+      containers:
+      - name: mapreduce
+        image: maxproske/mapreduce:latest
+        ports:
+        - containerPort: 3000
+          name: reducer
+        env:
+        - name: TYPE
+          value: "REDUCE"
